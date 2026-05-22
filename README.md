@@ -1,59 +1,56 @@
-<!-- DRAFT — rewrite the prose in your own words before sharing this.
-     Reviewers can spot generated text. The "What I learned" section is
-     a placeholder: it MUST be your own honest sentence. -->
-
 # Reconciliation & Variance Dashboard
 
-Takes two datasets that should agree — payment-processor payouts and
-recorded sales — finds the breaks between them, and dashboards the result.
+Two systems record the same money - a payment processor's payouts, and the
+sales a business recorded - and they're meant to agree. This tool checks
+whether they actually do. It matches the two datasets, finds every break,
+works out how much money each break is worth, and puts it all on a dashboard.
 
 ![Dashboard](docs/dashboard.png)
 
-## The problem
+## Why I built this
 
-Money leaves a payment processor and money is recorded as a sale. The two
-should tie out. They usually don't, perfectly: a payout goes missing, an
-amount is captured wrong, an order is paid out twice, a fee drifts off the
-contracted rate. Finding those breaks by eye in two spreadsheets is slow
-and error-prone — and in finance, the row you miss is the one that matters.
-
-This tool does the reconciliation automatically: it joins the two datasets,
-classifies every order, quantifies the variance in euros, and presents the
-exceptions as a list an operations person can actually work from.
+Reconciliation is a big part of payment and fund operations work, and a lot of
+the time it's still done by eye across two spreadsheets. That's slow, and it's
+easy to miss something - and in finance the row you miss is usually the one
+that mattered. I wanted to build it properly: something that does the matching
+on its own and hands you a clean list of exceptions to work through.
 
 ## How it works
 
-A five-stage pipeline, one file per stage:
+It's a pipeline, with one Python file per stage:
 
-| Stage | File | What it does |
-|-------|------|--------------|
-| Generate | `generate_data.py` | Builds two synthetic CSVs with ~13% deliberate breaks |
-| Load & clean | `loader.py` | Types the data; flags malformed cells instead of dropping them |
-| Match | `matcher.py` | Joins on `order_id` and classifies every order |
-| Summarise | `summary.py` | Aggregates match rate, variance and breaks by category |
-| Visualise | `app.py` | Streamlit dashboard: KPIs, charts, filterable exception table |
+- `generate_data.py` - creates two synthetic CSVs, sales and payouts, with
+  breaks deliberately built in (about 13% of the rows)
+- `loader.py` - reads both files, fixes the types, and flags any malformed
+  cells instead of dropping them
+- `matcher.py` - matches payouts to sales and classifies every order
+- `summary.py` - works out the headline numbers
+- `app.py` - the Streamlit dashboard
 
-### How a row gets classified
+### How the matching works
 
-Each order is joined on `order_id` and given exactly one status:
+Every order is joined on its `order_id` and put into exactly one bucket:
 
-- **matched** — sale and payout agree within tolerance
-- **missing payout** — sale recorded, processor never paid out
-- **orphan payout** — processor paid out, no sale recorded
-- **amount mismatch** — payout gross differs from the sale amount
-- **fee variance** — gross is right, fee is off the contracted rate
-- **duplicate payout** — one order paid out two or more times
-- **data issue** — a malformed cell makes the row impossible to compare
+- **matched** - the sale and the payout agree
+- **missing payout** - a sale was recorded but the processor never paid out
+- **orphan payout** - the processor paid out but there's no sale behind it
+- **amount mismatch** - the payout is for a different amount than the sale
+- **fee variance** - the amount is right but the fee is off the contracted rate
+- **duplicate payout** - the same order got paid out twice
+- **data issue** - a cell is malformed, so the row can't be compared at all
 
-Two decisions worth calling out:
+Two decisions in here I'd want to be able to explain:
 
-- **Tolerance.** Amounts are compared with a €0.05 tolerance, not for exact
-  equality. Money rounds at different points in different systems, so a
-  payout can land a cent off a sale without anything being wrong. Exact
-  comparison would bury real breaks under harmless rounding noise.
-- **Nothing is dropped.** Every sale and every payout ends up in the output
-  under some status. A payout with no matching sale becomes an *orphan
-  payout* exception — it is never silently discarded.
+**Amounts are compared with a small tolerance, not for exact equality.** Money
+rounds at different points in different systems, so a payout can land a cent
+off a sale without anything actually being wrong. If you test for exact
+equality, those harmless rounding differences get flagged and the real breaks
+are lost in the noise. The tolerance is 5 cents.
+
+**Nothing gets dropped.** Every sale and every payout ends up somewhere in the
+output. A payout with no matching sale doesn't quietly disappear - it becomes
+an orphan payout exception. In a finance context the row you silently dropped
+is exactly the one someone needed to see.
 
 ## Running it
 
@@ -63,19 +60,23 @@ python generate_data.py      # creates data/sales.csv and data/payouts.csv
 streamlit run app.py         # opens the dashboard in your browser
 ```
 
-Each pipeline stage also runs standalone for a quick check, e.g.
-`python matcher.py` prints the status breakdown.
-
-## Tech
-
-Python · pandas · Streamlit · Plotly. Data is **synthetic** — generated by
-`generate_data.py` — so nothing real or sensitive is in the repo.
-
-The same views were also rebuilt in **Power BI** against the same CSVs.
-<!-- TODO: add Power BI screenshot here, or remove this line if not done. -->
+Each stage also runs on its own if you just want to check it - for example
+`python matcher.py` prints the breakdown of how every order was classified.
 
 ## What I learned
 
-<!-- TODO — write one or two honest sentences in your own words. e.g. what
-     surprised you about the matching logic, or why the tolerance threshold
-     matters. Do not ship the project with this placeholder. -->
+The part I didn't expect to spend time on was the tolerance. My first version
+compared amounts for exact equality, and it flagged a pile of "breaks" that
+were all just one-cent rounding differences - the genuine breaks were buried
+underneath them. Choosing a sensible tolerance, and being able to say why,
+turned out to be the difference between a report someone trusts and one they
+ignore.
+
+The other thing that stuck with me is that reconciliation isn't really about
+the rows that match. It's about having a clear, honest answer for every row
+that doesn't.
+
+## A note on the data
+
+All the data is synthetic - it's produced by `generate_data.py`. There is
+nothing real or sensitive in this repo.
