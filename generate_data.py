@@ -42,8 +42,12 @@ FEE_FIXED = 0.30          # + EUR 0.30 per transaction
 # Where the CSVs go. data/ is git-ignored so we never commit generated files.
 DATA_DIR = Path(__file__).parent / "data"
 
-# Currency mix -- mostly EUR (Dublin/IFSC context), a few GBP/USD.
-CURRENCIES = ["EUR", "EUR", "EUR", "EUR", "GBP", "USD"]
+# Currency mix. This tool is scoped to EUR settlement (a processor
+# reconciles within one settlement currency), so ~95% of sales are EUR.
+# The small non-EUR slice is intentional: the cleaning layer flags
+# those rows for a manual FX check rather than mis-summing them into
+# the EUR variance total.
+CURRENCIES = ["EUR"] * 38 + ["GBP", "USD"]
 
 START_DATE = date(2024, 1, 1)
 DATE_RANGE_DAYS = 120
