@@ -173,6 +173,18 @@ def main() -> None:
     for payout in random.sample(payouts, 12):
         payout["status"] = random.choice(["pending", "failed"])
 
+    # Seed a few malformed cells -- the kind of dirty data any real
+    # CSV export contains. The cleaning layer must coerce these to
+    # NaN/NaT and flag them, not crash or silently treat them as zero.
+    for sale in random.sample(sales, 3):
+        sale["amount"] = ""                       # blank numeric
+    for sale in random.sample(sales, 2):
+        sale["customer_ref"] = ""                 # blank reference
+    for payout in random.sample(payouts, 2):
+        payout["net_amount"] = ""                 # blank numeric
+    for payout in random.sample(payouts, 1):
+        payout["date"] = "not-a-date"             # unparseable date
+
     # Shuffle so the files don't arrive in a tidy, unrealistic order.
     random.shuffle(payouts)
 
