@@ -76,6 +76,8 @@ def reconcile(sales: pd.DataFrame, payouts: pd.DataFrame,
 
         row = {
             "order_id": order_id,
+            "sale_date": sale.date,
+            "payout_date": pd.NaT,
             "sale_amount": sale.amount,
             "payout_gross": pd.NA,
             "payout_fee": pd.NA,
@@ -107,6 +109,7 @@ def reconcile(sales: pd.DataFrame, payouts: pd.DataFrame,
             total_gross = group["gross_amount"].sum()
             row["payout_gross"] = total_gross
             row["payout_fee"] = group["fee"].sum()
+            row["payout_date"] = group["date"].min()
             row["variance"] = total_gross - sale.amount
             row["status"] = "duplicate_payout"
             row["detail"] = (
@@ -120,6 +123,7 @@ def reconcile(sales: pd.DataFrame, payouts: pd.DataFrame,
         payout = group.iloc[0]
         row["payout_gross"] = payout["gross_amount"]
         row["payout_fee"] = payout["fee"]
+        row["payout_date"] = payout["date"]
         row["expected_fee"] = expected_fee(payout["gross_amount"])
         if pd.notna(payout["date"]) and pd.notna(sale.date):
             row["settlement_lag_days"] = (payout["date"] - sale.date).days
@@ -160,6 +164,8 @@ def reconcile(sales: pd.DataFrame, payouts: pd.DataFrame,
         total_gross = group["gross_amount"].sum()
         results.append({
             "order_id": order_id,
+            "sale_date": pd.NaT,
+            "payout_date": group["date"].min(),
             "sale_amount": pd.NA,
             "payout_gross": total_gross,
             "payout_fee": group["fee"].sum(),
@@ -172,8 +178,9 @@ def reconcile(sales: pd.DataFrame, payouts: pd.DataFrame,
         })
 
     column_order = [
-        "order_id", "status", "sale_amount", "payout_gross", "payout_fee",
-        "expected_fee", "variance", "n_payouts", "settlement_lag_days", "detail",
+        "order_id", "status", "sale_date", "payout_date",
+        "sale_amount", "payout_gross", "payout_fee", "expected_fee",
+        "variance", "n_payouts", "settlement_lag_days", "detail",
     ]
     return pd.DataFrame(results, columns=column_order)
 
