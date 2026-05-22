@@ -137,10 +137,18 @@ def main() -> None:
             payout["fee"] = expected_fee(payout["gross_amount"])
             payout["net_amount"] = round(payout["gross_amount"] - payout["fee"], 2)
 
-        if i in fee_idx:
+        elif i in fee_idx:
             # BREAK: fee is wrong while gross is right. Net stops tying out.
             payout["fee"] = round(payout["fee"] * random.uniform(1.8, 3.5), 2)
             payout["net_amount"] = round(payout["gross_amount"] - payout["fee"], 2)
+
+        elif random.random() < 0.08:
+            # NOT a break: sub-cent rounding noise on an otherwise-clean
+            # payout. The matching engine's tolerance threshold should
+            # absorb this so it is classified 'matched', not flagged.
+            payout["gross_amount"] = round(
+                payout["gross_amount"] + random.choice([-0.02, -0.01, 0.01, 0.02]), 2
+            )
 
         payouts.append(payout)
 
